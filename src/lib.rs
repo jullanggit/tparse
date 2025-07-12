@@ -132,6 +132,15 @@ impl<T: TParse> TParse for IsNot<T> {
     }
 }
 
+/// Matches if the entire input was consumed by the child parser
+pub struct AllConsumed<T: TParse>(T);
+impl<T: TParse> TParse for AllConsumed<T> {
+    fn tparse(input: &str) -> Option<(Self, usize)> {
+        let (parsed, offset) = T::tparse(input)?;
+        offset.eq(&input.len()).then_some((Self(parsed), offset))
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
