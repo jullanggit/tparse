@@ -1,0 +1,7 @@
+[package]
+name = "tparse"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tstr = { version = "0.2.4", features = ["nightly_const_generics"] }
