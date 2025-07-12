@@ -1,6 +1,8 @@
 #![feature(adt_const_params)]
 #![feature(unsized_const_params)]
 
+use std::marker::PhantomData;
+
 pub trait TParse
 where
     Self: Sized,
@@ -92,7 +94,7 @@ impl<T: TParse> TParse for Vec<T> {
 
 /// A Vec containing at least N elements.
 /// This is only enforced when parsing using tparse.
-struct VecContaining<const N: usize, T>(pub Vec<T>);
+pub struct VecContaining<const N: usize, T>(pub Vec<T>);
 impl<const N: usize, T: TParse> TParse for VecContaining<N, T> {
     fn tparse(input: &str) -> Option<(Self, usize)> {
         let (vec, offset) = Vec::tparse(input)?;
@@ -107,6 +109,25 @@ impl<T: TParse> TParse for Option<T> {
         match parsed {
             None => Some((None, 0)),
             Some((parsed, offset)) => Some((Some(parsed), offset)),
+        }
+    }
+}
+
+/// Checks if the wrapped type matches, without advancing the offset
+pub struct Is<T: TParse>(PhantomData<T>);
+impl<T: TParse> TParse for Is<T> {
+    fn tparse(input: &str) -> Option<(Self, usize)> {
+        T::tparse(input).map(|_| (Self(PhantomData), 0))
+    }
+}
+
+/// Checks if the wrapped type does not match, without advancing the offset
+pub struct IsNot<T: TParse>(PhantomData<T>);
+impl<T: TParse> TParse for IsNot<T> {
+    fn tparse(input: &str) -> Option<(Self, usize)> {
+        match T::tparse(input) {
+            None => Some((Self(PhantomData), 0)),
+            Some(_) => None,
         }
     }
 }
