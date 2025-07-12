@@ -1,11 +1,9 @@
 #![feature(adt_const_params)]
 #![feature(unsized_const_params)]
 
-use std::marker::PhantomData;
+pub struct TStr<const STR: &'static str>();
 
-struct TStr<const STR: &'static str>();
-
-trait TParse
+pub trait TParse
 where
     Self: Sized,
 {
@@ -33,9 +31,10 @@ impl TParse for char {
     }
 }
 
-/// Greedily match on the options
-macro_rules! OR {
-    ($enum:ident, $($ty:ident),+) => {
+/// Greedily matches on the options
+#[macro_export]
+macro_rules! Or {
+    {$enum:ident, $($ty:ident),+} => {
         enum $enum {
             $(
                 $ty($ty),
