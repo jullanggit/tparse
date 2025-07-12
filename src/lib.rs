@@ -12,7 +12,7 @@ where
     fn tparse(input: &str) -> Option<(Self, usize)>;
 }
 
-/// A type containing a compile-time unique string
+/// A compile-time unique string
 #[derive(Debug, PartialEq)]
 pub struct TStr<const STR: &'static str>;
 impl<const STR: &'static str> TParse for TStr<STR> {
@@ -36,7 +36,10 @@ impl TParse for char {
     }
 }
 
-/// Greedily matches on the options
+/// Tries each child parser in order, returning the first successful match
+/// ```rust
+/// Or!(EnumName, P1, P2, ...)
+/// ```
 #[macro_export]
 macro_rules! Or {
     {$enum:ident, $($ty:ident),+} => {
@@ -58,7 +61,10 @@ macro_rules! Or {
     };
 }
 
-/// Match on all arguments followed by each other
+/// Matches each child parser in order
+/// ```rust
+/// `Concat!(StructName, P1, P2, ...)`
+/// ```
 #[macro_export]
 macro_rules! Concat {
     ($struct:ident, $($ty:ident),+) => {
@@ -92,10 +98,9 @@ impl<T: TParse> TParse for Vec<T> {
     }
 }
 
-/// A Vec containing at least N elements.
-/// This is only enforced when parsing using tparse.
-pub struct VecContaining<const N: usize, T>(pub Vec<T>);
-impl<const N: usize, T: TParse> TParse for VecContaining<N, T> {
+/// Matches at least N consecutive occurrences of T
+pub struct VecN<const N: usize, T>(pub Vec<T>);
+impl<const N: usize, T: TParse> TParse for VecN<N, T> {
     fn tparse(input: &str) -> Option<(Self, usize)> {
         let (vec, offset) = Vec::tparse(input)?;
         vec.len().ge(&N).then_some((Self(vec), offset))
