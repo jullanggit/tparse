@@ -1,10 +1,6 @@
 #![feature(adt_const_params)]
 #![feature(unsized_const_params)]
 
-/// A type containing a compile-time unique string
-#[derive(Debug, PartialEq)]
-pub struct TStr<const STR: &'static str>;
-
 pub trait TParse
 where
     Self: Sized,
@@ -14,6 +10,9 @@ where
     fn tparse(input: &str) -> Option<(Self, usize)>;
 }
 
+/// A type containing a compile-time unique string
+#[derive(Debug, PartialEq)]
+pub struct TStr<const STR: &'static str>;
 impl<const STR: &'static str> TParse for TStr<STR> {
     fn tparse(input: &str) -> Option<(Self, usize)> {
         let len = STR.len();
@@ -75,6 +74,41 @@ macro_rules! Concat {
             }
         }
     };
+}
+
+impl<T: TParse> TParse for Vec<T> {
+    fn tparse(input: &str) -> Option<(Self, usize)> {
+        let mut out = Vec::new();
+        let mut offset = 0;
+
+        while let Some((parsed, new_offset)) = T::tparse(&input[offset..]) {
+            out.push(parsed);
+            offset += new_offset;
+        }
+
+        Some((out, offset))
+    }
+}
+
+/// A Vec containing at least N elements.
+/// This is only enforced when parsing using tparse.
+struct VecContaining<const N: usize, T>(pub Vec<T>);
+impl<const N: usize, T: TParse> TParse for VecContaining<N, T> {
+    fn tparse(input: &str) -> Option<(Self, usize)> {
+        let (vec, offset) = Vec::tparse(input)?;
+        vec.len().ge(&N).then_some((Self(vec), offset))
+    }
+}
+
+impl<T: TParse> TParse for Option<T> {
+    fn tparse(input: &str) -> Option<(Self, usize)> {
+        let parsed = T::tparse(input);
+
+        match parsed {
+            None => Some((None, 0)),
+            Some((parsed, offset)) => Some((Some(parsed), offset)),
+        }
+    }
 }
 
 #[cfg(test)]
