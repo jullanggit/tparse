@@ -36,6 +36,15 @@ impl TParse for char {
     }
 }
 
+/// Matches any single unicode character between START and END
+pub struct RangedChar<const START: char, const END: char>(pub char);
+impl<const START: char, const END: char> TParse for RangedChar<START, END> {
+    fn tparse(input: &str) -> Option<(Self, usize)> {
+        let (char, offset) = char::tparse(input)?;
+        (START..END).contains(&char).then_some((Self(char), offset))
+    }
+}
+
 /// Tries each child parser in order, returning the first successful match
 /// ```rust
 /// Or!(EnumName, P1, P2, ...)

@@ -1,10 +1,12 @@
 Type-level parser combinators.
 
 The following basic parsers are implemented:
-- `TStr<const STR: &'static str>`
+- `TStr<STR>`
   - Exactly matches the compile-time string STR
 - `char`
   - Matches any single unicode character
+- `RangedChar<START, END>`
+  - Matches any single unicode character between START and END
 
 The following parser combinators are implemented:
 - `Or!(EnumName, P1, P2, ...)`
