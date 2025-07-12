@@ -1,21 +1,24 @@
+#![feature(adt_const_params)]
+#![feature(unsized_const_params)]
+
 use std::marker::PhantomData;
 
-use tstr::{StrValue, TS, TStr};
+struct TStr<const STR: &'static str>();
 
-trait TParse {
+trait TParse
+where
+    Self: Sized,
+{
     // TODO: handle errors better
     /// Option<(Self, advanced by)>
     fn tparse(input: &str) -> Option<(Self, usize)>;
 }
 
-impl<T> TParse for TStr<T>
-where
-    TStr<T>: StrValue,
-{
+impl<const STR: &'static str> TParse for TStr<STR> {
     fn tparse(input: &str) -> Option<(Self, usize)> {
-        let str = Self::STR;
+        let str = STR;
         let len = str.len();
-        (input[0..len] == str).then((Self::NEW, len))
+        (&input[0..len] == str).then_some((Self(), len))
     }
 }
 
@@ -41,7 +44,7 @@ macro_rules! OR {
         impl TParse for $enum {
             fn tparse(input: &str) -> Option<(Self, usize)> {
                 $(
-                    if let Some(parsed) = $ty::parse(input) {
+                    if let Some(parsed) = $ty::tparse(input) {
                         return Some((Self::$ty(parsed.0), parsed.1))
                     }
                 )+
@@ -50,5 +53,3 @@ macro_rules! OR {
         }
     };
 }
-
-OR!(TestEnum, char, TStr<T>);
