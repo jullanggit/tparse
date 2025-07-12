@@ -37,11 +37,14 @@ impl TParse for char {
 }
 
 /// Matches any single unicode character between START and END
+#[derive(Debug)]
 pub struct RangedChar<const START: char, const END: char>(pub char);
 impl<const START: char, const END: char> TParse for RangedChar<START, END> {
     fn tparse(input: &str) -> Option<(Self, usize)> {
         let (char, offset) = char::tparse(input)?;
-        (START..END).contains(&char).then_some((Self(char), offset))
+        (START..=END)
+            .contains(&char)
+            .then_some((Self(char), offset))
     }
 }
 
@@ -52,6 +55,7 @@ impl<const START: char, const END: char> TParse for RangedChar<START, END> {
 #[macro_export]
 macro_rules! Or {
     {$enum:ident, $($ty:ident),+} => {
+        #[derive(Debug)]
         enum $enum {
             $(
                 $ty($ty),
@@ -77,17 +81,20 @@ macro_rules! Or {
 #[macro_export]
 macro_rules! Concat {
     ($struct:ident, $($ty:ident),+) => {
+        #[derive(Debug)]
         struct $struct($($ty,)+);
         impl TParse for $struct {
             fn tparse(input: &str) -> Option<(Self, usize)> {
                 let mut offset = 0;
 
-                $(
-                    let ($ty, new_offset) = $ty::tparse(&input[offset..])?;
-                    offset += new_offset;
-                )+
-
-                Some((Self($($ty,)+), offset))
+                Some((Self($(
+                    {
+                        #[allow(non_snake_case)]
+                        let (parsed, new_offset) = $ty::tparse(&input[offset..])?;
+                        offset += new_offset;
+                        parsed
+                    },
+                )+), offset))
             }
         }
     };
@@ -108,6 +115,7 @@ impl<P: TParse> TParse for Vec<P> {
 }
 
 /// Matches at least N consecutive occurrences of P
+#[derive(Debug)]
 pub struct VecN<const N: usize, P>(pub Vec<P>);
 impl<const N: usize, P: TParse> TParse for VecN<N, P> {
     fn tparse(input: &str) -> Option<(Self, usize)> {
@@ -128,6 +136,7 @@ impl<P: TParse> TParse for Option<P> {
 }
 
 /// Lookahead: matches if P does, but without consuming input
+#[derive(Debug)]
 pub struct Is<P: TParse>(PhantomData<P>);
 impl<P: TParse> TParse for Is<P> {
     fn tparse(input: &str) -> Option<(Self, usize)> {
@@ -136,6 +145,7 @@ impl<P: TParse> TParse for Is<P> {
 }
 
 /// Negative lookahead: matches if P does *not*, without consuming input
+#[derive(Debug)]
 pub struct IsNot<P: TParse>(PhantomData<P>);
 impl<P: TParse> TParse for IsNot<P> {
     fn tparse(input: &str) -> Option<(Self, usize)> {
@@ -147,6 +157,7 @@ impl<P: TParse> TParse for IsNot<P> {
 }
 
 /// Matches if P matched the entire input
+#[derive(Debug)]
 pub struct AllConsumed<P: TParse>(P);
 impl<P: TParse> TParse for AllConsumed<P> {
     fn tparse(input: &str) -> Option<(Self, usize)> {
@@ -162,7 +173,7 @@ mod test {
     #[test]
     fn test_simple_concat() {
         type test_str = TStr<"test_str">;
-        Concat!(TestStruct, char, test_str);
+        Concat! {TestStruct, char, test_str};
 
         let tests = [
             ("ctest_str", Some((TestStruct('c', TStr), 9))),
@@ -182,5 +193,30 @@ mod test {
                 _ => panic!(),
             }
         }
+    }
+
+    #[test]
+    fn test_csv() {
+        type OptionMinus = Option<TStr<"-">>;
+        type Digits = VecN<1, RangedChar<'0', '9'>>;
+        Concat! {Field, OptionMinus, Digits};
+
+        type Comma = TStr<",">;
+        Concat!(CommaField, Comma, Field);
+        type CommaFields = Vec<CommaField>;
+
+        type Newline = TStr<"\n">;
+        Concat!(Record, Field, CommaFields, Newline);
+
+        type File = AllConsumed<Vec<Record>>;
+
+        let input = "65279,1179403647,1463895090
+31415927,27182817,-1618034
+-40,-27315
+13,42
+65537
+";
+        let parsed = File::tparse(input);
+        assert!(parsed.is_some());
     }
 }
