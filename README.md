@@ -12,9 +12,9 @@ The following parser combinators are implemented:
 - `Concat!(StructName, P1, P2, ...)`
   - Matches each child parser in order
 - `Vec<P>`
-  - Match any number of consecutive occurrences of P
+  - Matches any number of consecutive occurrences of P
 - `VecN<P>`
-  - Match at least N consecutive occurrences of P
+  - Matches at least N consecutive occurrences of P
 - `Option<P>`
   - Always matches, returns None if P failed and the result if P succeeded
 - `Is<P>`
@@ -22,7 +22,7 @@ The following parser combinators are implemented:
 - `IsNot<P>`
   - Negative lookahead: matches if P does *not*, but without consuming input
 - `AllConsumed<P>`
-  - Match if P matched the entire input
+  - Matches if P matched the entire input
 
 > [!NOTE]
 Currently requires the nightly compiler

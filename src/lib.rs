@@ -84,12 +84,12 @@ macro_rules! Concat {
     };
 }
 
-impl<T: TParse> TParse for Vec<T> {
+impl<P: TParse> TParse for Vec<P> {
     fn tparse(input: &str) -> Option<(Self, usize)> {
         let mut out = Vec::new();
         let mut offset = 0;
 
-        while let Some((parsed, new_offset)) = T::tparse(&input[offset..]) {
+        while let Some((parsed, new_offset)) = P::tparse(&input[offset..]) {
             out.push(parsed);
             offset += new_offset;
         }
@@ -98,18 +98,18 @@ impl<T: TParse> TParse for Vec<T> {
     }
 }
 
-/// Matches at least N consecutive occurrences of T
-pub struct VecN<const N: usize, T>(pub Vec<T>);
-impl<const N: usize, T: TParse> TParse for VecN<N, T> {
+/// Matches at least N consecutive occurrences of P
+pub struct VecN<const N: usize, P>(pub Vec<P>);
+impl<const N: usize, P: TParse> TParse for VecN<N, P> {
     fn tparse(input: &str) -> Option<(Self, usize)> {
         let (vec, offset) = Vec::tparse(input)?;
         vec.len().ge(&N).then_some((Self(vec), offset))
     }
 }
 
-impl<T: TParse> TParse for Option<T> {
+impl<P: TParse> TParse for Option<P> {
     fn tparse(input: &str) -> Option<(Self, usize)> {
-        let parsed = T::tparse(input);
+        let parsed = P::tparse(input);
 
         match parsed {
             None => Some((None, 0)),
@@ -118,30 +118,30 @@ impl<T: TParse> TParse for Option<T> {
     }
 }
 
-/// Checks if the wrapped type matches, without advancing the offset
-pub struct Is<T: TParse>(PhantomData<T>);
-impl<T: TParse> TParse for Is<T> {
+/// Lookahead: matches if P does, but without consuming input
+pub struct Is<P: TParse>(PhantomData<P>);
+impl<P: TParse> TParse for Is<P> {
     fn tparse(input: &str) -> Option<(Self, usize)> {
-        T::tparse(input).map(|_| (Self(PhantomData), 0))
+        P::tparse(input).map(|_| (Self(PhantomData), 0))
     }
 }
 
-/// Checks if the wrapped type does not match, without advancing the offset
-pub struct IsNot<T: TParse>(PhantomData<T>);
-impl<T: TParse> TParse for IsNot<T> {
+/// Negative lookahead: matches if P does *not*, without consuming input
+pub struct IsNot<P: TParse>(PhantomData<P>);
+impl<P: TParse> TParse for IsNot<P> {
     fn tparse(input: &str) -> Option<(Self, usize)> {
-        match T::tparse(input) {
+        match P::tparse(input) {
             None => Some((Self(PhantomData), 0)),
             Some(_) => None,
         }
     }
 }
 
-/// Matches if the entire input was consumed by the child parser
-pub struct AllConsumed<T: TParse>(T);
-impl<T: TParse> TParse for AllConsumed<T> {
+/// Matches if P matched the entire input
+pub struct AllConsumed<P: TParse>(P);
+impl<P: TParse> TParse for AllConsumed<P> {
     fn tparse(input: &str) -> Option<(Self, usize)> {
-        let (parsed, offset) = T::tparse(input)?;
+        let (parsed, offset) = P::tparse(input)?;
         offset.eq(&input.len()).then_some((Self(parsed), offset))
     }
 }
