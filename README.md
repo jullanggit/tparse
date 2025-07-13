@@ -11,7 +11,7 @@ Type-level parser combinators.
 ## Parser Combinators
 - `Or!(EnumName, P1, P2, ...)`
   - Tries each child parser in order, returning the first successful match
-- `Concat!(StructName, P1, P2, ...)`
+- `Or!(EnumName, VariantName1 = P1, VariantName2 = P2, ...)`
   - Matches each child parser in order
 - `Vec<P>`
   - Matches any number of consecutive occurrences of P

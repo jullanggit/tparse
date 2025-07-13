@@ -50,8 +50,9 @@ impl<const START: char, const END: char> TParse for RangedChar<START, END> {
 
 /// Tries each child parser in order, returning the first successful match
 /// ```rust
-/// Or!(EnumName, P1, P2, ...)
+/// Or!(EnumName, VariantName1 = P1, VariantName2 = P2, ...)
 /// ```
+// TODO: support for omitting the variant name in simple cases
 #[macro_export]
 macro_rules! Or {
     {$enum:ident, $($variant:ident = $ty:ty),+} => {
@@ -64,7 +65,7 @@ macro_rules! Or {
         impl TParse for $enum {
             fn tparse(input: &str) -> Option<(Self, usize)> {
                 $(
-                    if let Some(parsed) = $ty::tparse(input) {
+                    if let Some(parsed) = <$ty>::tparse(input) {
                         return Some((Self::$variant(parsed.0), parsed.1))
                     }
                 )+
@@ -197,9 +198,9 @@ mod test {
 
     #[test]
     fn test_csv() {
-        Concat! {Field, Option<TStr<"-">>, VecN<1, RangedChar<'0', '9'>>};
-        Concat! {CommaField, TStr<",">, Field};
-        Concat! {Record, Field, Vec<CommaField>, TStr<"\n">};
+        Concat! {Field, Option<TStr<"-">>, VecN<1, RangedChar<'0', '9'>>}
+        Concat! {CommaField, TStr<",">, Field}
+        Concat! {Record, Field, Vec<CommaField>, TStr<"\n">}
 
         type File = AllConsumed<Vec<Record>>;
 
