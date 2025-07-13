@@ -15,6 +15,11 @@ where
 /// A compile-time unique string
 #[derive(Debug, PartialEq)]
 pub struct TStr<const STR: &'static str>;
+impl<const STR: &'static str> TStr<STR> {
+    pub fn str(&self) -> &'static str {
+        STR
+    }
+}
 impl<const STR: &'static str> TParse for TStr<STR> {
     fn tparse(input: &str) -> Option<(Self, usize)> {
         let len = STR.len();
