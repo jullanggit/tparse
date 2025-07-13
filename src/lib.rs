@@ -54,18 +54,18 @@ impl<const START: char, const END: char> TParse for RangedChar<START, END> {
 /// ```
 #[macro_export]
 macro_rules! Or {
-    {$enum:ident, $($ty:ident),+} => {
+    {$enum:ident, $($variant:ident = $ty:ty),+} => {
         #[derive(Debug)]
         enum $enum {
             $(
-                $ty($ty),
+                $variant($ty),
             )+
         }
         impl TParse for $enum {
             fn tparse(input: &str) -> Option<(Self, usize)> {
                 $(
                     if let Some(parsed) = $ty::tparse(input) {
-                        return Some((Self::$ty(parsed.0), parsed.1))
+                        return Some((Self::$variant(parsed.0), parsed.1))
                     }
                 )+
                 None
@@ -80,7 +80,7 @@ macro_rules! Or {
 /// ```
 #[macro_export]
 macro_rules! Concat {
-    ($struct:ident, $($ty:ident),+) => {
+    ($struct:ident, $($ty:ty),+) => {
         #[derive(Debug)]
         struct $struct($($ty,)+);
         impl TParse for $struct {
@@ -90,7 +90,7 @@ macro_rules! Concat {
                 Some((Self($(
                     {
                         #[allow(non_snake_case)]
-                        let (parsed, new_offset) = $ty::tparse(&input[offset..])?;
+                        let (parsed, new_offset) = <$ty>::tparse(&input[offset..])?;
                         offset += new_offset;
                         parsed
                     },
@@ -197,16 +197,9 @@ mod test {
 
     #[test]
     fn test_csv() {
-        type OptionMinus = Option<TStr<"-">>;
-        type Digits = VecN<1, RangedChar<'0', '9'>>;
-        Concat! {Field, OptionMinus, Digits};
-
-        type Comma = TStr<",">;
-        Concat!(CommaField, Comma, Field);
-        type CommaFields = Vec<CommaField>;
-
-        type Newline = TStr<"\n">;
-        Concat!(Record, Field, CommaFields, Newline);
+        Concat! {Field, Option<TStr<"-">>, VecN<1, RangedChar<'0', '9'>>};
+        Concat! {CommaField, TStr<",">, Field};
+        Concat! {Record, Field, Vec<CommaField>, TStr<"\n">};
 
         type File = AllConsumed<Vec<Record>>;
 
