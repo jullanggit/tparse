@@ -159,7 +159,7 @@ impl<P: TParse> TParse for IsNot<P> {
 
 /// Matches if P matched the entire input
 #[derive(Debug)]
-pub struct AllConsumed<P: TParse>(P);
+pub struct AllConsumed<P: TParse>(pub P);
 impl<P: TParse> TParse for AllConsumed<P> {
     fn tparse(input: &str) -> Option<(Self, usize)> {
         let (parsed, offset) = P::tparse(input)?;
