@@ -2,6 +2,7 @@
 #![feature(unsized_const_params)]
 
 use std::marker::PhantomData;
+use unsynn::{CommaDelimitedVec, IParse, Span, ToTokens, TokenStream, unsynn};
 
 pub trait TParse
 where
@@ -104,6 +105,12 @@ macro_rules! Concat {
             }
         }
     };
+}
+
+#[proc_macro]
+fn impl_tparse_concat_for_tuple(input: TokenStream) -> TokenStream {
+    let n: CommaDelimitedVec<u16> = input.to_token_iter().parse().unwrap();
+    n.into_iter().for_each(|x| x.value);
 }
 
 macro_rules! impl_tparse_concat_for_tuple {
