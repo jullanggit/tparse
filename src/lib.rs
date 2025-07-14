@@ -82,6 +82,7 @@ macro_rules! Or {
     };
 }
 
+// tuples
 macro_rules! _impl_tparse_for_tuple_inner {
     ($($generic:ident),+ $(,)?) => {
         impl<$($generic: TParse),+> TParse for ($($generic),+) {
@@ -99,21 +100,15 @@ macro_rules! _impl_tparse_for_tuple_inner {
         }
     };
 }
-
-/// Implements tparse for the given tuple lengths.
-#[macro_export]
-macro_rules! impl_tparse_for_tuple {
-    ($($n:literal),+) => {
-        $(
-            seq!(I in 1..=$n {
-                // expands to exactly one invocation
-                _impl_tparse_for_tuple_inner!(
-                    #(P~I,)*
-                );
-            });
-        )+
-    };
-}
+seq!(I in 2..=32 {
+    #(
+        seq!(J in 1..=I {
+            _impl_tparse_for_tuple_inner!(
+                #(P~J,)*
+            );
+        });
+    )*
+});
 
 impl<P: TParse> TParse for Vec<P> {
     fn tparse(input: &str) -> Option<(Self, usize)> {
@@ -184,8 +179,6 @@ impl<P: TParse> TParse for AllConsumed<P> {
 #[cfg(test)]
 mod test {
     use super::*;
-
-    impl_tparse_for_tuple!(2, 3);
 
     #[test]
     fn test_simple_concat() {
