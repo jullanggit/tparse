@@ -106,6 +106,25 @@ macro_rules! Concat {
     };
 }
 
+macro_rules! impl_tparse_concat_for_tuple {
+    ($($generic:ident),+) => {
+        impl<$($generic: TParse),+> TParse for ($($generic),+) {
+            fn tparse(input: &str) -> Option<(Self, usize)> {
+                let mut offset = 0;
+
+                Some((($(
+                    {
+                        #[allow(non_snake_case)]
+                        let (parsed, new_offset) = $generic::tparse(&input[offset..])?;
+                        offset += new_offset;
+                        parsed
+                    },
+                )+), offset))
+            }
+        }
+    };
+}
+
 impl<P: TParse> TParse for Vec<P> {
     fn tparse(input: &str) -> Option<(Self, usize)> {
         let mut out = Vec::new();
