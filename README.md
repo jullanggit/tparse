@@ -9,10 +9,11 @@ Type-level parser combinators.
   - Matches any single unicode character between START and END
 
 ## Parser Combinators
-- `Or!(EnumName, P1, P2, ...)`
-  - Tries each child parser in order, returning the first successful match
+- `(P1, P2, ...)`
+  - Matches each child parser in order.
+  - Initially not implemented for any tuple lengths, use the `impl_tparse_for_tuple!(len1, len2, ...);` macro to do so for the lengths you use.[^1]
 - `Or!(EnumName, VariantName1 = P1, VariantName2 = P2, ...)`
-  - Matches each child parser in order
+  - Creates an Enum that tries each child parser in order, returning the first successful match
 - `Vec<P>`
   - Matches any number of consecutive occurrences of P
 - `VecN<P>`
@@ -25,6 +26,7 @@ Type-level parser combinators.
   - Negative lookahead: matches if P does *not*, but without consuming input
 - `AllConsumed<P>`
   - Matches if P matched the entire input
+[^1]: This is done to provide the user the flexibility to use *any* tuple lengths, without generating excessive amounts of unused code.
 
 ## Examples
 A CSV file containing integers

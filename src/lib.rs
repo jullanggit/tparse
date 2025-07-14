@@ -3,6 +3,8 @@
 
 use std::marker::PhantomData;
 
+use seq_macro::seq;
+
 pub trait TParse
 where
     Self: Sized,
@@ -80,23 +82,15 @@ macro_rules! Or {
     };
 }
 
-/// Matches each child parser in order
-/// ```rust
-/// `Concat!(StructName, P1, P2, ...)`
-/// ```
-#[macro_export]
-macro_rules! Concat {
-    ($struct:ident, $($ty:ty),+) => {
-        #[derive(Debug)]
-        struct $struct($($ty,)+);
-        impl TParse for $struct {
+macro_rules! _impl_tparse_for_tuple_inner {
+    ($($generic:ident),+ $(,)?) => {
+        impl<$($generic: TParse),+> TParse for ($($generic),+) {
             fn tparse(input: &str) -> Option<(Self, usize)> {
                 let mut offset = 0;
 
-                Some((Self($(
+                Some((($(
                     {
-                        #[allow(non_snake_case)]
-                        let (parsed, new_offset) = <$ty>::tparse(&input[offset..])?;
+                        let (parsed, new_offset) = $generic::tparse(&input[offset..])?;
                         offset += new_offset;
                         parsed
                     },
@@ -106,22 +100,18 @@ macro_rules! Concat {
     };
 }
 
-macro_rules! impl_tparse_concat_for_tuple {
-    ($($generic:ident),+) => {
-        impl<$($generic: TParse),+> TParse for ($($generic),+) {
-            fn tparse(input: &str) -> Option<(Self, usize)> {
-                let mut offset = 0;
-
-                Some((($(
-                    {
-                        #[allow(non_snake_case)]
-                        let (parsed, new_offset) = $generic::tparse(&input[offset..])?;
-                        offset += new_offset;
-                        parsed
-                    },
-                )+), offset))
-            }
-        }
+/// Implements tparse for the given tuple lengths.
+#[macro_export]
+macro_rules! impl_tparse_for_tuple {
+    ($($n:literal),+) => {
+        $(
+            seq!(I in 1..=$n {
+                // expands to exactly one invocation
+                _impl_tparse_for_tuple_inner!(
+                    #(P~I,)*
+                );
+            });
+        )+
     };
 }
 
@@ -195,19 +185,20 @@ impl<P: TParse> TParse for AllConsumed<P> {
 mod test {
     use super::*;
 
+    impl_tparse_for_tuple!(2, 3);
+
     #[test]
     fn test_simple_concat() {
         type test_str = TStr<"test_str">;
-        Concat! {TestStruct, char, test_str};
 
         let tests = [
-            ("ctest_str", Some((TestStruct('c', TStr), 9))),
+            ("ctest_str", Some((('c', TStr), 9))),
             ("test_str", None),
-            ("\0test_str\0\0\0", Some((TestStruct('\0', TStr), 9))),
+            ("\0test_str\0\0\0", Some((('\0', TStr), 9))),
         ];
 
         for (input, output) in tests {
-            let parsed = TestStruct::tparse(input);
+            let parsed = <(char, test_str)>::tparse(input);
             match (parsed, output) {
                 (None, None) => {}
                 (Some(parsed), Some(output)) => {
@@ -222,9 +213,8 @@ mod test {
 
     #[test]
     fn test_csv() {
-        Concat! {Field, Option<TStr<"-">>, VecN<1, RangedChar<'0', '9'>>}
-        Concat! {CommaField, TStr<",">, Field}
-        Concat! {Record, Field, Vec<CommaField>, TStr<"\n">}
+        type Field = (Option<TStr<"-">>, VecN<1, RangedChar<'0', '9'>>);
+        type Record = (Field, Vec<(TStr<",">, Field)>, TStr<"\n">);
 
         type File = AllConsumed<Vec<Record>>;
 
