@@ -176,6 +176,14 @@ impl<P: TParse> TParse for AllConsumed<P> {
     }
 }
 
+/// Always matches, contains the remaining length of the input
+pub struct RemainingLength(pub usize);
+impl TParse for RemainingLength {
+    fn tparse(input: &str) -> Option<(Self, usize)> {
+        Some((Self(input.len()), 0))
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
