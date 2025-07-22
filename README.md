@@ -7,6 +7,8 @@ Type-level parser combinators.
   - Matches any single unicode character
 - `RangedChar<START, END>`
   - Matches any single unicode character between START and END
+- `RemainingLength`
+  - Always matches, contains the remaining length of the input
 
 ## Parser Combinators
 - `(P1, P2, ..., P32)`

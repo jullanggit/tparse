@@ -55,6 +55,15 @@ impl<const START: char, const END: char> TParse for RangedChar<START, END> {
     }
 }
 
+/// Always matches, contains the remaining length of the input
+#[derive(Debug)]
+pub struct RemainingLength(pub usize);
+impl TParse for RemainingLength {
+    fn tparse(input: &str) -> Option<(Self, usize)> {
+        Some((Self(input.len()), 0))
+    }
+}
+
 /// Tries each child parser in order, returning the first successful match
 /// ```rust
 /// Or!(EnumName, VariantName1 = P1, VariantName2 = P2, ...)
@@ -173,14 +182,6 @@ impl<P: TParse> TParse for AllConsumed<P> {
     fn tparse(input: &str) -> Option<(Self, usize)> {
         let (parsed, offset) = P::tparse(input)?;
         offset.eq(&input.len()).then_some((Self(parsed), offset))
-    }
-}
-
-/// Always matches, contains the remaining length of the input
-pub struct RemainingLength(pub usize);
-impl TParse for RemainingLength {
-    fn tparse(input: &str) -> Option<(Self, usize)> {
-        Some((Self(input.len()), 0))
     }
 }
 
