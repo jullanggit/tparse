@@ -28,7 +28,7 @@ impl<const STR: &'static str> TParse for TStr<STR> {
         if len > input.len() {
             return None;
         }
-        input[0..len].eq(STR).then_some((Self, len))
+        input.get(0..len).eq(&Some(STR)).then_some((Self, len))
     }
 }
 
