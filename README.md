@@ -14,7 +14,11 @@ Type-level parser combinators.
 - `(P1, P2, ..., P32)`
   - Matches each child parser in order, up to length 32.
 - `Or!(EnumName, VariantName1 = P1, VariantName2 = P2, ...)`
-  - Creates an Enum that tries each child parser in order, returning the first successful match
+  - Creates an Enum with one variant per child parser.
+  - Tries each child parser in order, returning the variant corresponding to the first successful match.
+- `Or<(P1, P2, .., P32)>`
+  - Tries each child parser in order, until the first successful match, *without* returning any data.
+  - Intended as a lightweight alternative to Or!, that is composable with sequentially matching tuples.
 - `Vec<P>`
   - Matches any number of consecutive occurrences of P
 - `VecN<P>`

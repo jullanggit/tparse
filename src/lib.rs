@@ -64,7 +64,8 @@ impl TParse for RemainingLength {
     }
 }
 
-/// Tries each child parser in order, returning the first successful match
+/// Creates an Enum with one variant per child parser.
+/// Tries each child parser in order, returning the variant corresponding to the first successful match.
 /// ```rust
 /// Or!(EnumName, VariantName1 = P1, VariantName2 = P2, ...)
 /// ```
@@ -81,8 +82,8 @@ macro_rules! Or {
         impl TParse for $enum {
             fn tparse(input: &str) -> Option<(Self, usize)> {
                 $(
-                    if let Some(parsed) = <$ty>::tparse(input) {
-                        return Some((Self::$variant(parsed.0), parsed.1))
+                    if let Some((data, offset)) = <$ty>::tparse(input) {
+                        return Some((Self::$variant(data), offset))
                     }
                 )+
                 None
@@ -90,6 +91,37 @@ macro_rules! Or {
         }
     };
 }
+
+/// Tries each child parser in order, until the first successful match, but does *not* return any data of the match or indication which one matched.
+/// If you desire these properties, use the Or! macro. This Type is intended as a more lightweight alternative, that is composable with sequentially matching tuples.
+/// ```rust
+/// type Example = Or<(P1, P2, .., P32)>;
+/// ```
+#[derive(Debug)]
+pub struct Or<T>(PhantomData<T>);
+macro_rules! _impl_tparse_for_or_tuple {
+    ($($generic:ident),+ $(,)?) => {
+        impl<$($generic: TParse),+> TParse for Or<($($generic),+)> {
+            fn tparse(input: &str) -> Option<(Self, usize)> {
+                $(
+                    if let Some((_, offset)) = <$generic>::tparse(input) {
+                        return Some((Self(PhantomData), offset));
+                    }
+                )+
+                None
+            }
+        }
+    };
+}
+seq!(I in 2..=32 {
+    #(
+        seq!(J in 1..=I {
+            _impl_tparse_for_or_tuple!(
+                #(P~J,)*
+            );
+        });
+    )*
+});
 
 // tuples
 macro_rules! _impl_tparse_for_tuple_inner {
@@ -206,6 +238,34 @@ mod test {
                 (Some(parsed), Some(output)) => {
                     assert_eq!(parsed.0.0, output.0.0);
                     assert_eq!(parsed.0.1, output.0.1);
+                    assert_eq!(parsed.1, output.1);
+                }
+                _ => panic!(),
+            }
+        }
+    }
+
+    #[test]
+    fn test_lightweight_or() {
+        type TestInner = (TStr<"test_str">, VecN<2, TStr<"a">>, TStr<"t">);
+        type Test = Or<TestInner>;
+
+        let tests = [
+            ("test_str", Some((Or(PhantomData::<TestInner>), 8))),
+            ("test_strrrr", Some((Or(PhantomData::<TestInner>), 8))),
+            ("btest_str", None),
+            ("ttest_str", Some((Or(PhantomData::<TestInner>), 1))),
+            ("aatest_str", Some((Or(PhantomData::<TestInner>), 2))),
+            ("aaaa\0aaa", Some((Or(PhantomData::<TestInner>), 4))),
+            ("baaa\0aaa", None),
+            ("\0", None),
+        ];
+
+        for (input, output) in tests {
+            let parsed = Test::tparse(input);
+            match (parsed, output) {
+                (None, None) => {}
+                (Some(parsed), Some(output)) => {
                     assert_eq!(parsed.1, output.1);
                 }
                 _ => panic!(),
