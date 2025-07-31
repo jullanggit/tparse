@@ -1,17 +1,16 @@
 #![feature(adt_const_params)]
 #![feature(unsized_const_params)]
 
-use std::marker::PhantomData;
+use std::{any::Any, marker::PhantomData};
 
 use seq_macro::seq;
 
-pub trait TParse
-where
-    Self: Sized,
-{
+pub trait TParse {
     // TODO: handle errors better
     /// Option<(Self, advanced by)>
-    fn tparse(input: &str) -> Option<(Self, usize)>;
+    fn tparse(input: &str) -> Option<(Self, usize)>
+    where
+        Self: Sized;
 }
 
 /// A compile-time unique string
@@ -89,6 +88,105 @@ macro_rules! Or {
             }
         }
     };
+}
+
+pub trait MapType {
+    type Map<T>;
+}
+pub struct IsPresent;
+impl MapType for IsPresent {
+    type Map<T> = T;
+}
+pub struct IsNothing;
+impl MapType for IsNothing {
+    type Map<T> = ();
+}
+
+pub trait HasBuilder {
+    type Builder;
+
+    fn builder() -> Self::Builder;
+}
+
+pub struct Or<T>(Box<dyn Any>, PhantomData<T>);
+impl<T1: TParse + 'static, T2: TParse + 'static> TParse for Or<(T1, T2)> {
+    fn tparse(input: &str) -> Option<(Self, usize)>
+    where
+        Self: Sized,
+    {
+        if let Some((data, offset)) = T1::tparse(input) {
+            return Some((Self(Box::new(data), PhantomData), offset));
+        }
+        if let Some((data, offset)) = T2::tparse(input) {
+            return Some((Self(Box::new(data), PhantomData), offset));
+        }
+        None
+    }
+}
+impl<T1: TParse + 'static, T2: TParse + 'static> Or<(T1, T2)> {
+    #[must_use]
+    pub fn matcher(self) -> PartialOrMatcher<(T1, T2), (IsPresent, IsPresent)> {
+        PartialOrMatcher(self, PhantomData)
+    }
+}
+pub struct PartialOrMatcher<T, F>(Or<T>, PhantomData<F>);
+impl<T1: TParse + 'static, T2: TParse + 'static, M2: MapType> MatchType<0>
+    for PartialOrMatcher<(T1, T2), (IsPresent, M2)>
+{
+    type Output = T1;
+    type Next = PartialOrMatcher<(T1, T2), (IsNothing, M2)>;
+
+    fn match_type(self) -> Result<Box<T1>, Self::Next> {
+        match self.0.0.downcast::<T1>() {
+            Ok(downcasted) => Ok(downcasted),
+            Err(any) => Err(PartialOrMatcher(Or(any, PhantomData), PhantomData)),
+        }
+    }
+}
+impl<T1: TParse + 'static, T2: TParse + 'static, M1: MapType> MatchType<1>
+    for PartialOrMatcher<(T1, T2), (M1, IsPresent)>
+{
+    type Output = T2;
+    type Next = PartialOrMatcher<(T1, T2), (M1, IsNothing)>;
+
+    fn match_type(self) -> Result<Box<T2>, Self::Next> {
+        match self.0.0.downcast::<T2>() {
+            Ok(downcasted) => Ok(downcasted),
+            Err(any) => Err(PartialOrMatcher(Or(any, PhantomData), PhantomData)),
+        }
+    }
+}
+impl<T1: TParse + 'static, T2: TParse + 'static> FinalizeMatcher
+    for PartialOrMatcher<(T1, T2), (IsNothing, IsNothing)>
+{
+}
+
+pub trait MatchType<const VARIANT: usize> {
+    type Output;
+    type Next;
+
+    fn match_type(self) -> Result<Box<Self::Output>, Self::Next>;
+}
+
+pub trait FinalizeMatcher: Sized {
+    fn finalize_match(self) {}
+}
+
+pub fn test() {
+    type sdf = Or<(TStr<"sf">, char)>;
+    let parsed = sdf::tparse("sdfsdfsdf").unwrap().0;
+    let matcher = parsed.matcher();
+    match MatchType::<0>::match_type(matcher) {
+        Ok(tstr) => {
+            dbg!(tstr);
+        }
+        Err(next) => match next.match_type() {
+            Ok(char) => {
+                dbg!(char);
+            }
+            Err(next) => next.finalize_match(),
+        },
+    }
 }
 
 // tuples
