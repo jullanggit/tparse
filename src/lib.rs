@@ -102,6 +102,19 @@ impl MapType for IsNothing {
     type Map<T> = ();
 }
 
+pub trait TupleMapType<T> {
+    type Map;
+}
+seq!(L in 1..=32 {
+    #(
+        seq!(N in 1..=L {
+            impl<#(M~N: MapType, T~N,)*> TupleMapType<(#(T~N,)*)> for (#(M~N,)*) {
+                type Map = (#(M~N::Map<T~N>,)*);
+            }
+        });
+    )*
+});
+
 pub trait HasBuilder {
     type Builder;
 
@@ -124,68 +137,87 @@ impl<T1: TParse + 'static, T2: TParse + 'static> TParse for Or<(T1, T2)> {
     }
 }
 impl<T1: TParse + 'static, T2: TParse + 'static> Or<(T1, T2)> {
-    #[must_use]
-    pub fn matcher(self) -> PartialOrMatcher<(T1, T2), (IsPresent, IsPresent)> {
-        PartialOrMatcher(self, PhantomData)
+    pub fn matcher<Args, Out>(
+        self,
+        args: Args,
+    ) -> Matcher<
+        (T1, T2),
+        Args,
+        (fn(Box<T1>, Args) -> Out, fn(Box<T2>, Args) -> Out),
+        (IsNothing, IsNothing),
+    > {
+        Matcher(args, ((), ()), self)
     }
 }
-pub struct PartialOrMatcher<T, F>(Or<T>, PhantomData<F>);
-impl<T1: TParse + 'static, T2: TParse + 'static, M2: MapType> MatchType<0>
-    for PartialOrMatcher<(T1, T2), (IsPresent, M2)>
-{
-    type Output = T1;
-    type Next = PartialOrMatcher<(T1, T2), (IsNothing, M2)>;
 
-    fn match_type(self) -> Result<Box<T1>, Self::Next> {
-        match self.0.0.downcast::<T1>() {
-            Ok(downcasted) => Ok(downcasted),
-            Err(any) => Err(PartialOrMatcher(Or(any, PhantomData), PhantomData)),
-        }
-    }
-}
-impl<T1: TParse + 'static, T2: TParse + 'static, M1: MapType> MatchType<1>
-    for PartialOrMatcher<(T1, T2), (M1, IsPresent)>
-{
-    type Output = T2;
-    type Next = PartialOrMatcher<(T1, T2), (M1, IsNothing)>;
+pub struct Matcher<Parsers, Args, Fns, Maps: TupleMapType<Fns>>(Args, Maps::Map, Or<Parsers>);
 
-    fn match_type(self) -> Result<Box<T2>, Self::Next> {
-        match self.0.0.downcast::<T2>() {
-            Ok(downcasted) => Ok(downcasted),
-            Err(any) => Err(PartialOrMatcher(Or(any, PhantomData), PhantomData)),
-        }
-    }
-}
-impl<T1: TParse + 'static, T2: TParse + 'static> FinalizeMatcher
-    for PartialOrMatcher<(T1, T2), (IsNothing, IsNothing)>
-{
-}
-
-pub trait MatchType<const VARIANT: usize> {
+pub trait RegisterMatcher<const VARIANT: usize> {
     type Output;
-    type Next;
+    type Matcher;
 
-    fn match_type(self) -> Result<Box<Self::Output>, Self::Next>;
+    fn register_matcher(self, f: Self::Matcher) -> Self::Output;
 }
 
-pub trait FinalizeMatcher: Sized {
-    fn finalize_match(self) {}
+impl<P1, P2, Args, Out, M2: MapType> RegisterMatcher<0>
+    for Matcher<
+        (P1, P2),
+        Args,
+        (fn(Box<P1>, Args) -> Out, fn(Box<P2>, Args) -> Out),
+        (IsNothing, M2),
+    >
+{
+    type Matcher = fn(Box<P1>, Args) -> Out;
+    type Output = Matcher<
+        (P1, P2),
+        Args,
+        (fn(Box<P1>, Args) -> Out, fn(Box<P2>, Args) -> Out),
+        (IsPresent, M2),
+    >;
+    fn register_matcher(self, f: Self::Matcher) -> Self::Output {
+        Matcher(self.0, (f, self.1.1), self.2)
+    }
 }
 
-pub fn test() {
-    type sdf = Or<(TStr<"sf">, char)>;
-    let parsed = sdf::tparse("sdfsdfsdf").unwrap().0;
-    let matcher = parsed.matcher();
-    match MatchType::<0>::match_type(matcher) {
-        Ok(tstr) => {
-            dbg!(tstr);
+impl<P1, P2, Args, Out, M1: MapType> RegisterMatcher<1>
+    for Matcher<
+        (P1, P2),
+        Args,
+        (fn(Box<P1>, Args) -> Out, fn(Box<P2>, Args) -> Out),
+        (M1, IsNothing),
+    >
+{
+    type Matcher = fn(Box<P2>, Args) -> Out;
+    type Output = Matcher<
+        (P1, P2),
+        Args,
+        (fn(Box<P1>, Args) -> Out, fn(Box<P2>, Args) -> Out),
+        (M1, IsPresent),
+    >;
+    fn register_matcher(self, f: Self::Matcher) -> Self::Output {
+        Matcher(self.0, (self.1.0, f), self.2)
+    }
+}
+
+impl<P1: 'static, P2: 'static, Args, Out>
+    Matcher<
+        (P1, P2),
+        Args,
+        (fn(Box<P1>, Args) -> Out, fn(Box<P2>, Args) -> Out),
+        (IsPresent, IsPresent),
+    >
+{
+    pub fn do_match(self) -> Out {
+        let mut dyn_parser = self.2.0;
+        match dyn_parser.downcast::<P1>() {
+            Ok(parser) => return self.1.0(parser, self.0),
+            Err(e) => dyn_parser = e,
         }
-        Err(next) => match next.match_type() {
-            Ok(char) => {
-                dbg!(char);
-            }
-            Err(next) => next.finalize_match(),
-        },
+        match dyn_parser.downcast::<P2>() {
+            Ok(parser) => return self.1.1(parser, self.0),
+            Err(e) => dyn_parser = e,
+        }
+        unreachable!()
     }
 }
 
@@ -326,5 +358,23 @@ mod test {
 ";
         let parsed = File::tparse(input);
         assert!(parsed.is_some());
+    }
+
+    #[test]
+    fn test_or() {
+        type SomeOr = Or<(TStr<"something">, (IsNot<char>, char))>;
+        let parsed = SomeOr::tparse("something").unwrap().0;
+
+        let mut string = String::new();
+        let set = false;
+
+        let matcher = parsed.matcher((&mut string, set));
+        let matcher = RegisterMatcher::<0>::register_matcher(matcher, |tstr, (string, set)| {
+            string.push_str(tstr.str());
+            set
+        });
+        let matcher = matcher.register_matcher(|_, (_, _)| unreachable!());
+        let out = matcher.do_match();
+        assert_eq!(out, set);
     }
 }
