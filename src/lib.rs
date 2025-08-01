@@ -115,12 +115,6 @@ seq!(L in 1..=32 {
     )*
 });
 
-pub trait HasBuilder {
-    type Builder;
-
-    fn builder() -> Self::Builder;
-}
-
 pub struct Or<T>(Box<dyn Any>, PhantomData<T>);
 impl<T1: TParse + 'static, T2: TParse + 'static> TParse for Or<(T1, T2)> {
     fn tparse(input: &str) -> Option<(Self, usize)>
@@ -134,19 +128,6 @@ impl<T1: TParse + 'static, T2: TParse + 'static> TParse for Or<(T1, T2)> {
             return Some((Self(Box::new(data), PhantomData), offset));
         }
         None
-    }
-}
-impl<T1: TParse + 'static, T2: TParse + 'static> Or<(T1, T2)> {
-    pub fn matcher<Args, Out>(
-        self,
-        args: Args,
-    ) -> Matcher<
-        (T1, T2),
-        Args,
-        (fn(Box<T1>, Args) -> Out, fn(Box<T2>, Args) -> Out),
-        (IsNothing, IsNothing),
-    > {
-        Matcher(args, ((), ()), self)
     }
 }
 
@@ -220,6 +201,8 @@ impl<P1: 'static, P2: 'static, Args, Out>
         unreachable!()
     }
 }
+
+impl_matcher::impl_or_matcher!(32);
 
 // tuples
 macro_rules! _impl_tparse_for_tuple_inner {

@@ -5,3 +5,7 @@ edition = "2024"
 
 [dependencies]
 seq-macro = "0.3.6"
+impl_matcher = { path = "./impl_matcher" }
+
+[workspace]
+members = ["impl_matcher"]
