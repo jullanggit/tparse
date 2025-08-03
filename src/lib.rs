@@ -116,90 +116,13 @@ seq!(L in 1..=32 {
 });
 
 pub struct Or<T>(Box<dyn Any>, PhantomData<T>);
-impl<T1: TParse + 'static, T2: TParse + 'static> TParse for Or<(T1, T2)> {
-    fn tparse(input: &str) -> Option<(Self, usize)>
-    where
-        Self: Sized,
-    {
-        if let Some((data, offset)) = T1::tparse(input) {
-            return Some((Self(Box::new(data), PhantomData), offset));
-        }
-        if let Some((data, offset)) = T2::tparse(input) {
-            return Some((Self(Box::new(data), PhantomData), offset));
-        }
-        None
-    }
-}
-
 pub struct Matcher<Parsers, Args, Fns, Maps: TupleMapType<Fns>>(Args, Maps::Map, Or<Parsers>);
 
-pub trait RegisterMatcher<const VARIANT: usize> {
+pub trait AddMatcher<const VARIANT: usize> {
     type Output;
     type Matcher;
 
-    fn register_matcher(self, f: Self::Matcher) -> Self::Output;
-}
-
-impl<P1, P2, Args, Out, M2: MapType> RegisterMatcher<0>
-    for Matcher<
-        (P1, P2),
-        Args,
-        (fn(Box<P1>, Args) -> Out, fn(Box<P2>, Args) -> Out),
-        (IsNothing, M2),
-    >
-{
-    type Matcher = fn(Box<P1>, Args) -> Out;
-    type Output = Matcher<
-        (P1, P2),
-        Args,
-        (fn(Box<P1>, Args) -> Out, fn(Box<P2>, Args) -> Out),
-        (IsPresent, M2),
-    >;
-    fn register_matcher(self, f: Self::Matcher) -> Self::Output {
-        Matcher(self.0, (f, self.1.1), self.2)
-    }
-}
-
-impl<P1, P2, Args, Out, M1: MapType> RegisterMatcher<1>
-    for Matcher<
-        (P1, P2),
-        Args,
-        (fn(Box<P1>, Args) -> Out, fn(Box<P2>, Args) -> Out),
-        (M1, IsNothing),
-    >
-{
-    type Matcher = fn(Box<P2>, Args) -> Out;
-    type Output = Matcher<
-        (P1, P2),
-        Args,
-        (fn(Box<P1>, Args) -> Out, fn(Box<P2>, Args) -> Out),
-        (M1, IsPresent),
-    >;
-    fn register_matcher(self, f: Self::Matcher) -> Self::Output {
-        Matcher(self.0, (self.1.0, f), self.2)
-    }
-}
-
-impl<P1: 'static, P2: 'static, Args, Out>
-    Matcher<
-        (P1, P2),
-        Args,
-        (fn(Box<P1>, Args) -> Out, fn(Box<P2>, Args) -> Out),
-        (IsPresent, IsPresent),
-    >
-{
-    pub fn do_match(self) -> Out {
-        let mut dyn_parser = self.2.0;
-        match dyn_parser.downcast::<P1>() {
-            Ok(parser) => return self.1.0(parser, self.0),
-            Err(e) => dyn_parser = e,
-        }
-        match dyn_parser.downcast::<P2>() {
-            Ok(parser) => return self.1.1(parser, self.0),
-            Err(e) => dyn_parser = e,
-        }
-        unreachable!()
-    }
+    fn add_matcher(self, f: Self::Matcher) -> Self::Output;
 }
 
 impl_matcher::impl_or_matcher!(32);
@@ -352,11 +275,11 @@ mod test {
         let set = false;
 
         let matcher = parsed.matcher((&mut string, set));
-        let matcher = RegisterMatcher::<0>::register_matcher(matcher, |tstr, (string, set)| {
+        let matcher = AddMatcher::<0>::add_matcher(matcher, |tstr, (string, set)| {
             string.push_str(tstr.str());
             set
         });
-        let matcher = matcher.register_matcher(|_, (_, _)| unreachable!());
+        let matcher = matcher.add_matcher(|_, (_, _)| unreachable!());
         let out = matcher.do_match();
         assert_eq!(out, set);
     }
