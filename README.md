@@ -14,7 +14,8 @@ Always matches, contains the remaining length of the input
 ### (P1, P2, ..., P32)
 Matches each child parser in order, up to length 32.
 ### Or!(EnumName, VariantName1 = P1, VariantName2 = P2, ...)
-Creates an Enum that tries each child parser in order, returning the first successful match
+Creates an Enum with one variant per child parser.
+Tries each child parser in order, returning the variant corresponding to the first successful match.
 ### Or<(P1, P2, ..., P16)>
 Tries each child parser in order (up to 16), storing the first successful match.
 Use .matcher() to match on the child parsers.

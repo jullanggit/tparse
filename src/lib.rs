@@ -63,7 +63,8 @@ impl TParse for RemainingLength {
     }
 }
 
-/// Tries each child parser in order, returning the first successful match
+/// Creates an Enum with one variant per child parser.
+/// Tries each child parser in order, returning the variant corresponding to the first successful match.
 /// ```rust
 /// Or!(EnumName, VariantName1 = P1, VariantName2 = P2, ...)
 /// ```
