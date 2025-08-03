@@ -105,7 +105,7 @@ impl MapType for IsNothing {
 pub trait TupleMapType<T> {
     type Map;
 }
-seq!(L in 1..=32 {
+seq!(L in 1..=16 {
     #(
         seq!(N in 1..=L {
             impl<#(M~N: MapType, T~N,)*> TupleMapType<(#(T~N,)*)> for (#(M~N,)*) {
@@ -115,7 +115,18 @@ seq!(L in 1..=32 {
     )*
 });
 
+/// Tries each child parser in order (up to 16), storing the first successful match.
+/// Use .matcher() to match on the child parsers.
+/// ```rust
+/// Or<(P1, P2, ..., P16)>
+/// ```
 pub struct Or<T>(Box<dyn Any>, PhantomData<T>);
+
+/// A matcher type-level guaranteeing a match on all possibilities.
+/// Uses a builder-like pattern, but on tuples, to emulate an enum without having to create one,
+///  so this type (and thus `Or`) can be used inside other types.
+/// Use AddMatcher<I>::add_matcher() to add a matcher for the parser at index I.
+/// Once a matcher for all parsers is added, use .do_match().
 pub struct Matcher<Parsers, Args, Fns, Maps: TupleMapType<Fns>>(Args, Maps::Map, Or<Parsers>);
 
 pub trait AddMatcher<const VARIANT: usize> {
@@ -125,7 +136,7 @@ pub trait AddMatcher<const VARIANT: usize> {
     fn add_matcher(self, f: Self::Matcher) -> Self::Output;
 }
 
-impl_matcher::impl_or_matcher!(32);
+impl_matcher::impl_or_matcher!();
 
 // tuples
 macro_rules! _impl_tparse_for_tuple_inner {
