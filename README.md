@@ -39,6 +39,7 @@ Negative lookahead: matches if P does *not*, but without consuming input
 Matches if P matched the entire input
 
 ## Examples
+Not up to date! TODO
 A CSV file containing integers
 ```rust
 type OptionMinus = Option<TStr<"-">>;
