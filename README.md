@@ -39,31 +39,7 @@ Negative lookahead: matches if P does *not*, but without consuming input
 Matches if P matched the entire input
 
 ## Examples
-Not up to date! TODO
-A CSV file containing integers
-```rust
-type OptionMinus = Option<TStr<"-">>;
-type Digits = VecN<1, RangedChar<'0', '9'>>;
-Concat! {Field, OptionMinus, Digits};
-
-type Comma = TStr<",">;
-Concat!(CommaField, Comma, Field);
-type CommaFields = Vec<CommaField>;
-
-type Newline = TStr<"\n">;
-Concat!(Record, Field, CommaFields, Newline);
-
-type File = AllConsumed<Vec<Record>>;
-
-let input = "65279,1179403647,1463895090
-31415927,27182817,-1618034
--40,-27315
-13,42
-65537
-";
-let parsed = File::tparse(input);
-assert!(parsed.is_some());
-```
+[Anksidian's markdown parser](https://github.com/jullanggit/anksidian/blob/main/src/handle_md.rs) is implemented using tparse.
 
 > [!NOTE]
 Currently requires the nightly compiler
